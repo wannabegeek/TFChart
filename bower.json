@@ -1,0 +1,24 @@
+{
+  "name": "tfchart",
+  "version": "0.1.0",
+  "homepage": "https://github.com/wannabegeek/TFChart",
+  "description": "A Simple HTML5 Canvas for drawing financial charts Chart Drawing",
+  "main": "dist/tfchart.min.js",
+  "moduleType": [
+    "globals"
+  ],
+  "keywords": [
+    "chart"
+  ],
+  "authors": [
+    "Tom Fewster"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
