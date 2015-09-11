@@ -85,6 +85,8 @@ function TFChart(container, renderer, options) {
     this.options = $.extend({}, defaults, options || {});
     this.options.theme = $.extend({}, defaults.theme, this.options.theme || {});
 
+    renderer.setOptions(this.options);
+
     this.x_axis = {
         formatter: new DateTimeAxisFormatter(),
         padding: 70.0,
@@ -173,6 +175,13 @@ TFChart.prototype.setData = function(data) {
     this.data = data;
     this._updateVisible();
 
+    this.redraw();
+}
+
+TFChart.prototype.reset = function() {
+    var area = this._drawableArea();
+    this.data_window = new TFChartWindow(0.0, area.size.width, this.options.space_right);
+    this._updateVisible();
     this.redraw();
 }
 
@@ -505,7 +514,7 @@ TFChart.prototype.onMouseWheelScroll = function(e) {
     var deltaX = (e.wheelDeltaX || -e.detail);
     var deltaY = (e.wheelDeltaY || -e.detail);
     if (deltaX) {
-        this.move(deltaX, true);
+        this.pan(deltaX, true);
     }
     if (deltaY) {
         var area = this._plotArea();

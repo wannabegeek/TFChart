@@ -1,6 +1,6 @@
 {
   "name": "tfchart",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "homepage": "https://github.com/wannabegeek/TFChart",
   "description": "A Simple HTML5 Canvas for drawing financial charts Chart Drawing",
   "main": "dist/tfchart.min.js",

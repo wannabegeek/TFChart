@@ -14,14 +14,14 @@ module.exports = function(grunt) {
                 'libs/*.js', // All JS in the libs folder
                 //'js/global.js'  // This specific file
             ],
-            dest: 'dist/tfcharts.js',
+            dest: 'dist/tfchart.js',
             }
         },
 
         uglify: {
             build: {
-                src: 'dist/tfcharts.js',
-                dest: 'dist/tfcharts.min.js'
+                src: 'dist/tfchart.js',
+                dest: 'dist/tfchart.min.js'
             }
         },
 
