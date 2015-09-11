@@ -1,4 +1,7 @@
-function TFChartCandlestickRenderer(options) {
+function TFChartCandlestickRenderer() {
+}
+
+TFChartCandlestickRenderer.prototype.setOptions = function(options) {
     var default_theme = {
             upFillColor: "rgb(215, 84, 66)",
             upStrokeColor: "rgb(107, 42, 33)",
@@ -7,21 +10,17 @@ function TFChartCandlestickRenderer(options) {
             wickColor: "rgb(180, 180, 180)"        
     };
 
-    var defaults = {
-        theme: default_theme
-    };
-
-    this.options = $.extend({}, defaults, options || {});
-    this.options.theme = $.extend({}, defaults.theme, this.options.theme || {});
+    this.theme = $.extend({}, default_theme, options.theme.candlestick || {});
 }
+
 
 TFChartCandlestickRenderer.prototype._fillCandle = function(ctx, isUp) {
     if (!isUp) {
-        ctx.fillStyle = this.options.theme.upFillColor;
-        ctx.strokeStyle = this.options.theme.upStrokeColor;
+        ctx.fillStyle = this.theme.upFillColor;
+        ctx.strokeStyle = this.theme.upStrokeColor;
     } else {
-        ctx.fillStyle = this.options.theme.downFillColor;
-        ctx.strokeStyle = this.options.theme.downStrokeColor;
+        ctx.fillStyle = this.theme.downFillColor;
+        ctx.strokeStyle = this.theme.downStrokeColor;
     }
     ctx.fill();
     ctx.stroke();
@@ -50,7 +49,7 @@ TFChartCandlestickRenderer.prototype.render = function(data, chart_view) {
                             body_bottom - body_top);
             self._fillCandle(ctx, point.close >= point.open);
 
-            ctx.strokeStyle = self.options.theme.wickColor;
+            ctx.strokeStyle = self.theme.wickColor;
             ctx.beginPath();
             var wick_location = Math.round(offset) + 0.5;
             ctx.moveTo(wick_location, chart_view.pixelValueAtYValue(point.high));

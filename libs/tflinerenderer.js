@@ -1,14 +1,12 @@
-function TFChartLineRenderer(options) {
+function TFChartLineRenderer() {
+}
+
+TFChartLineRenderer.prototype.setOptions = function(options) {
     var default_theme = {
         lineColor: "#FF0000"
     };
 
-    var defaults = {
-        theme: default_theme
-    };
-
-    this.options = $.extend({}, defaults, options || {});
-    this.theme = $.extend({}, default_theme, this.options.theme || {});
+    this.theme = $.extend({}, default_theme, options.theme.line || {});
 }
 
 TFChartLineRenderer.prototype.render = function(data, chart_view) {

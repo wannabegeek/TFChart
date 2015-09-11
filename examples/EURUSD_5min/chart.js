@@ -1,6 +1,18 @@
 $(function() {
     renderer = new TFChartCandlestickRenderer();
-    chart = new TFChart($('#chartContainer'), renderer);
+
+    // lets have some candles not the standard red/green
+    var options = {
+        theme: {
+            candlestick: {
+                upFillColor: "rgb(84, 215, 66)",
+                upStrokeColor: "rgb(42, 107, 33)",
+                downFillColor: "rgb(107, 165, 131)",
+                downStrokeColor: "rgb(53, 82, 65)",
+            }
+        }
+    };
+    chart = new TFChart($('#chartContainer'), renderer, options);
 
     chart.setData(sampleData);//.slice(sampleData.length - 100));
 
