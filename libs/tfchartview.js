@@ -211,6 +211,18 @@ TFChart.prototype.addAnnotation = function(annotation) {
     this._drawAnnotations();
 }
 
+TFChart.prototype.removeAnnotation = function(annotation) {
+    var index = this.annotations.indexOf(annotation);
+    if (index > -1) {
+        this.annotations.splice(index, 1);
+        this._drawAnnotations();
+    }
+}
+
+TFChart.prototype.removeAnnotations = function() {
+    this.annotations.splice(0, this.annotations.length)
+}
+
 TFChart.prototype.redraw = function() {
     var width = this.chart_canvas.width();
     var height = this.chart_canvas.height();
