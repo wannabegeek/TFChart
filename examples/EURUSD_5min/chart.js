@@ -32,4 +32,8 @@ $(function() {
 
     annotation4 = new TFChartVerticalRay('rgba(50, 50, 160, 0.9)', TFChartPointMake(sampleData[564].timestamp, sampleData[564].high));
     chart.addAnnotation(annotation4);
+
+    setTimeout(function(c) {
+        c.setVisible(1432565100, 1432775700);
+    }, 5000, chart);
 });

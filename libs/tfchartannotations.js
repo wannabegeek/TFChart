@@ -118,7 +118,5 @@ TFChartPolygon.prototype.render = function(bounds, chart_view) {
             ctx.strokeStyle = this.borderColor;
             ctx.stroke();
         }
-    } else {
-        console.log("box doesn;t intersect");
     }
 }
