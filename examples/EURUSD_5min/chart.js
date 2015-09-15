@@ -10,6 +10,10 @@ $(function() {
                 downFillColor: "rgb(107, 165, 131)",
                 downStrokeColor: "rgb(53, 82, 65)",
             }
+        },
+        view_range: function(chart, x_range, y_range) {
+            $("input#startDate").val(moment(x_range.position * 1000).format("YYYY-MM-DD HH:mm:ss"));
+            $("input#endDate").val(moment((x_range.position + x_range.span) * 1000).format("YYYY-MM-DD HH:mm:ss"));
         }
     };
     chart = new TFChart($('#chartContainer'), renderer, options);
@@ -32,4 +36,23 @@ $(function() {
 
     annotation4 = new TFChartVerticalRay('rgba(50, 50, 160, 0.9)', TFChartPointMake(sampleData[564].timestamp, sampleData[564].high));
     chart.addAnnotation(annotation4);
+
+    // setTimeout(function(c) {
+    //     c.setVisible(1432565100, 1432775700);
+    // }, 5000, chart);
+
+
+    $("#submit_btn").click(function(event) {
+        event.preventDefault();
+        // validate and process form here
+        var startDate = $("input#startDate").val();
+        var startDateObj = moment(startDate, "YYYY-MM-DD HH:mm:ss");
+
+        var endDate = $("input#endDate").val();
+        var endDateObj = moment(endDate, "YYYY-MM-DD HH:mm:ss");
+        
+        chart.setVisible(startDateObj.unix(), endDateObj.unix());
+
+        return false;
+    });
 });

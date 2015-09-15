@@ -59,12 +59,6 @@ TFChartWindow.prototype.zoom = function(delta, area) {
     this._checkLimits(area);
 }
 
-TFChartWindow.prototype.log = function(area) {
-    var to_right = this.width - area.size.width + this.origin;
-    console.log("|-[" + roundToDP(-this.origin, 2) + "(" + roundToDP(-this.origin / this.width * 100.0, 2) + "%)" + "]-|XX-[" + roundToDP(area.size.width, 2)  + "(" + roundToDP(area.size.width / this.width * 100, 2) + "%)"+ "]-XX|-[" + roundToDP(to_right, 2) + "(" + roundToDP(to_right / this.width * 100, 2) + "%)" + "]-|-[" + roundToDP(this.space_right, 2) + "]-|");
-    // console.log("|--------------------" + this.width + "--------------------|");
-}
-
 //////////////////////////////////////////////////////////////////
 
 function TFChart(container, renderer, options) {
@@ -79,7 +73,8 @@ function TFChart(container, renderer, options) {
         },
         min_data_points: 15,
         max_data_points: 500,
-        space_right: 8.0
+        space_right: 8.0,
+        view_range: null
     };
 
     this.options = $.extend({}, defaults, options || {});
@@ -174,7 +169,29 @@ function TFChart(container, renderer, options) {
 TFChart.prototype.setData = function(data) {
     this.data = data;
     this._updateVisible();
+    this.redraw();
+}
 
+TFChart.prototype.setVisible = function(start, end) {
+    start_x = Math.max(start, this.data[0].timestamp);
+    end_x = Math.min(end, this.data[this.data.length - 1].timestamp);
+
+    var area = this._drawableArea();
+    this.bounds = null;
+
+    var visible_range = end_x - start_x;
+    var data_x_range = this.data[this.data.length - 2].timestamp - this.data[0].timestamp;
+
+    // this is proportion of the data which is visible
+    var ratio = visible_range / data_x_range;
+    
+    this.data_window.width = (area.size.width - area.origin.x) / ratio;
+
+    // number of pixels per time unit (across the whole range)
+    ratio = this.data_window.width / data_x_range;
+    this.data_window.origin = -(start_x - this.data[1].timestamp) * ratio;
+
+    this._updateVisible();
     this.redraw();
 }
 
@@ -291,9 +308,9 @@ TFChart.prototype._updateVisible = function() {
 
     var data_x_range = this.data[this.data.length - 1].timestamp - this.data[0].timestamp;
 
-    // this is the pixes per time unit
+    // this is the pixels per time unit
     var ratio = this.data_window.width / data_x_range;
-    var end_x = (area.size.width - area.origin.x - this.data_window.origin) / ratio + this.data[0].timestamp;
+    var end_x = Math.floor((area.size.width - area.origin.x - this.data_window.origin) / ratio + this.data[0].timestamp);
     var offset = (area.size.width - this.data_window.space_right) / ratio;
     start_x = end_x - offset;
 
@@ -320,6 +337,10 @@ TFChart.prototype._updateVisible = function() {
 
         this.x_axis.range = new TFChartRange(this.visible_data[0].timestamp, end_x - this.visible_data[0].timestamp);
         this.y_axis.range = new TFChartRange(min, max - min);
+        if (this.options.view_range !== null) {
+            this.options.view_range(this, this.x_axis.range, this.y_axis.range);
+        }
+
     }
 }
 

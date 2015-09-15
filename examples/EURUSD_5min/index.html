@@ -6,11 +6,19 @@
         <title>EURUSD</title>
     </head>
     <body>
-        <div class="title"></div>
+        <div class="range">
+            <form name="range" action="">
+                <fieldset>
+                    <label for="startDate">Start:</label><input type="text" name="startDate" id="startDate"/>
+                    <label for="endDate">End:</label><input type="text" name="endDate" id="endDate"/>
+                    <input type="submit" name="submit" class="button" id="submit_btn" value="Send" />
+                </fieldset>
+            </form>
+        </div>
         <div id="chartContainer">
         </div>
         <!--script type="text/javascript" src="/javascripts/jquery.1.9.1.min.js"></script-->
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
         <script type="text/javascript" src="../../dist/tfchart.js"></script>
         <script type="text/javascript" src="EURUSD.js"></script>
         <script type="text/javascript" src="chart.js"></script>
