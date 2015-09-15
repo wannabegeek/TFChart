@@ -100,7 +100,6 @@ function TFChart(container, renderer, options) {
     this.viewable_range = new TFChartRange(0.0, 0.0);
 
     this.data = [];
-    this.visible_data = [];
 
     this.annotations = [];
 
@@ -193,6 +192,10 @@ TFChart.prototype.setVisible = function(start, end) {
 
     this._updateVisible();
     this.redraw();
+}
+
+TFChart.prototype.doesXValueIntersectVisible = function(x) {
+    return this.x_axis.range.intersects(x);
 }
 
 TFChart.prototype.reset = function() {
@@ -310,37 +313,25 @@ TFChart.prototype._updateVisible = function() {
 
     // this is the pixels per time unit
     var ratio = this.data_window.width / data_x_range;
-    var end_x = Math.floor((area.size.width - area.origin.x - this.data_window.origin) / ratio + this.data[0].timestamp);
+    var end_x = Math.ceil((area.size.width - area.origin.x - this.data_window.origin) / ratio + this.data[0].timestamp);
     var offset = (area.size.width - this.data_window.space_right) / ratio;
-    start_x = end_x - offset;
+    start_x = Math.floor(end_x - offset);
 
-    var start_index = -1;
-    var end_index = this.data.length;
+    var min = null;
+    var max = null;
     $.each(this.data, function(index, point) {
-        if (start_index == -1 && point.timestamp > start_x) {
-            start_index = index;
-        }
-        if (index < end_index && point.timestamp > end_x) {
-            end_index = index;
+        if (point.timestamp > end_x) {
             return;
+        } else if (point.timestamp >= start_x) {
+            max = isNullOrUndefined(max) ? point.high : Math.max(max, point.high);
+            min = isNullOrUndefined(min) ? point.low : Math.min(min, point.low);
         }
     });
 
-    this.visible_data = this.data.slice(start_index, end_index);
-    if (this.visible_data.length > 0) {
-        var min = this.visible_data[0].low;
-        var max = this.visible_data[0].high;
-        $.each(this.visible_data, function(index, point) {
-            max = Math.max(max, point.high);
-            min = Math.min(min, point.low);
-        });
-
-        this.x_axis.range = new TFChartRange(this.visible_data[0].timestamp, end_x - this.visible_data[0].timestamp);
-        this.y_axis.range = new TFChartRange(min, max - min);
-        if (this.options.view_range !== null) {
-            this.options.view_range(this, this.x_axis.range, this.y_axis.range);
-        }
-
+    this.x_axis.range = new TFChartRange(start_x, end_x - start_x);
+    this.y_axis.range = new TFChartRange(min, max - min);
+    if (this.options.view_range !== null) {
+        this.options.view_range(this, this.x_axis.range, this.y_axis.range);
     }
 }
 
@@ -424,13 +415,13 @@ TFChart.prototype._drawAxis = function() {
 }
 
 TFChart.prototype._drawPlot = function() {
-    if (this.visible_data.length > 0) {
+    if (this.data.length > 0) {
 
         var area = this._plotArea();
         this.context.save();
         this.context.rect(area.origin.x, area.origin.y, area.size.width, area.size.height);
         this.context.clip();
-        this.renderer.render(this.visible_data, this);
+        this.renderer.render(this.data, this);
         this.context.restore();
     }
 }

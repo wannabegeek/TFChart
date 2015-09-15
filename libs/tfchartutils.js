@@ -9,6 +9,10 @@ function TFChartRange(position, span) {
     this.span = span;
 }
 
+TFChartRange.prototype.intersects = function(x) {
+    return (x >= this.position && x <= this.position + this.span);
+}
+
 TFChartRange.prototype.ratioForSize = function(x) {
     return x / this.span;    
 }
