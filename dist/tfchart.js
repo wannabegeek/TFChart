@@ -3080,7 +3080,7 @@ DateTimeAxisFormatter.prototype.calculateAxisTicks = function(axis, count) {
 DateTimeAxisFormatter.prototype.format = function(value, axis, is_crosshair) {
     // var m = new Moment();
     if (is_crosshair == true) {
-        return {text: moment(value * 1000).utc().format("YYYY-MM-DD HH:mm:ss"), is_key:false};
+        return {text: moment(value).utc().format("YYYY-MM-DD HH:mm:ss"), is_key:false};
     } else {
 
         var t = axis.tickSize;
@@ -3112,7 +3112,7 @@ DateTimeAxisFormatter.prototype.format = function(value, axis, is_crosshair) {
             is_key = true;
         }
 
-        return {text: moment(value * 1000).utc().format(fmt), is_key: is_key};
+        return {text: moment(value).utc().format(fmt), is_key: is_key};
     }
 }
 

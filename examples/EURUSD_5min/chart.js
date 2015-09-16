@@ -12,12 +12,12 @@ $(function() {
             }
         },
         view_range: function(chart, x_range, y_range) {
-            $("input#startDate").val(moment(x_range.position * 1000).format("YYYY-MM-DD HH:mm:ss"));
-            $("input#endDate").val(moment((x_range.position + x_range.span) * 1000).format("YYYY-MM-DD HH:mm:ss"));
+            $("input#startDate").val(moment(x_range.position).format("YYYY-MM-DD HH:mm:ss"));
+            $("input#endDate").val(moment(x_range.position + x_range.span).format("YYYY-MM-DD HH:mm:ss"));
         },
         controller: {
             has_data_available: function(chart, range) {
-                console.log("Requested: " + moment(range.position * 1000).format("YYYY-MM-DD HH:mm:ss") + " --> " + moment((range.position + range.span) * 1000).format("YYYY-MM-DD HH:mm:ss"));
+                console.log("Requested: " + moment(range.position).format("YYYY-MM-DD HH:mm:ss") + " --> " + moment(range.position + range.span).format("YYYY-MM-DD HH:mm:ss"));
                 return ((range.position + range.span) > sampleData[0].timestamp && range.position < sampleData[sampleData.length - 1].timestamp)
             },
             fetch_data: function(chart, range, callback) {
@@ -33,7 +33,7 @@ $(function() {
         }
     };
     chart = new TFChart($('#chartContainer'), renderer, options);
-    chart.setPeriod(300);
+    chart.setPeriod(300000);
 
     var initialData = sampleData.slice(0, sampleData.length / 3);
     chart.setData(initialData);
