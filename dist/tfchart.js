@@ -3476,6 +3476,27 @@ TFChart.prototype.zoom = function(delta, preventRedraw) {
 
 TFChart.prototype._checkDataAvailable = function() {
     if (typeof this.options.controller !== 'undefined') {
+        var evaluateVerticalRange = function(data) {
+            var min = self.y_axis.range.position;
+            var max = min + self.y_axis.range.span;
+            $.each(data, function(index, point) {
+                if (point.timestamp > self.x_axis.range.position + self.x_axis.range.span) {
+                    return;
+                } else if (point.timestamp >= self.x_axis.range.position) {
+                    max = Math.max(max, point.high);
+                    min = Math.min(min, point.low);
+                }
+            });
+            var delta = max - min;
+            var y_range = new TFChartRange(min, max - min);
+            if (!self.y_axis.range.equal(y_range)) {
+                self.y_axis.range = y_range;
+                if (self.options.view_range !== null) {
+                    self.options.view_range(self, self.x_axis.range, self.y_axis.range);
+                }
+            }
+        };
+
         if (this.data_window.origin > 0.0 && isNullOrUndefined(this.no_historic_data)) {
             var range =  new TFChartRange(this.x_axis.range.position - this.x_axis.range.span, this.x_axis.range.span)
             if (this.options.controller.has_data_available(this, range)) {
@@ -3486,29 +3507,8 @@ TFChart.prototype._checkDataAvailable = function() {
                     // we need to move our this.data_window.width & this.data_window.space_to_right to reflect the new data
                     self.setVisible(self.x_axis.range);
 
-                    // this.y_axis.range = new TFChartRange(min, max - min);
-                    // if (this.options.view_range !== null) {
-                    //     this.options.view_range(this, this.x_axis.range, this.y_axis.range);
-                    // }
                     // only scan our new data
-                    var min = this.y_axis.range.position;
-                    var max = min + this.y_axis.range.span;
-                    $.each(data, function(index, point) {
-                        if (point.timestamp > this.x_axis.range.position + this.x_axis.range.span) {
-                            return;
-                        } else if (point.timestamp >= this.x_axis.range.position) {
-                            max = Math.max(max, point.high);
-                            min = Math.min(min, point.low);
-                        }
-                    });
-                    var delta = max - min;
-                    var y_range = new TFChartRange(min, max - min);
-                    if (!this.y_axis.range.equal(y_range)) {
-                        this.y_axis.range = y_range;
-                        if (this.options.view_range !== null) {
-                            this.options.view_range(this, this.x_axis.range, this.y_axis.range);
-                        }
-                    }
+                    evaluateVerticalRange(data);
                     self.redraw();
                 });
             } else {
@@ -3529,24 +3529,7 @@ TFChart.prototype._checkDataAvailable = function() {
                     self.data_window.space_right = 0.0;
 
                     // only scan our new data
-                    var min = this.y_axis.range.position;
-                    var max = min + this.y_axis.range.span;
-                    $.each(data, function(index, point) {
-                        if (point.timestamp > this.x_axis.range.position + this.x_axis.range.span) {
-                            return;
-                        } else if (point.timestamp >= this.x_axis.range.position) {
-                            max = Math.max(max, point.high);
-                            min = Math.min(min, point.low);
-                        }
-                    });
-                    var delta = max - min;
-                    var y_range = new TFChartRange(min, max - min);
-                    if (!this.y_axis.range.equal(y_range)) {
-                        this.y_axis.range = y_range;
-                        if (this.options.view_range !== null) {
-                            this.options.view_range(this, this.x_axis.range, this.y_axis.range);
-                        }
-                    }
+                    evaluateVerticalRange(data);
                     self.redraw();
                 });
             } else {
