@@ -14,11 +14,29 @@ $(function() {
         view_range: function(chart, x_range, y_range) {
             $("input#startDate").val(moment(x_range.position * 1000).format("YYYY-MM-DD HH:mm:ss"));
             $("input#endDate").val(moment((x_range.position + x_range.span) * 1000).format("YYYY-MM-DD HH:mm:ss"));
+        },
+        controller: {
+            has_data_available: function(chart, range) {
+                console.log("Requested: " + moment(range.position * 1000).format("YYYY-MM-DD HH:mm:ss") + " --> " + moment((range.position + range.span) * 1000).format("YYYY-MM-DD HH:mm:ss"));
+                return ((range.position + range.span) > sampleData[0].timestamp && range.position < sampleData[sampleData.length - 1].timestamp)
+            },
+            fetch_data: function(chart, range, callback) {
+                console.log("Need to return more data");
+                var result = [];
+                $.each(sampleData, function(index, value) {
+                    if (range.intersects(value.timestamp)) {
+                        result.push(value);
+                    }
+                });
+                callback(result);
+            }
         }
     };
     chart = new TFChart($('#chartContainer'), renderer, options);
+    chart.setPeriod(300);
 
-    chart.setData(sampleData);//.slice(sampleData.length - 100));
+    var initialData = sampleData.slice(0, sampleData.length / 3);
+    chart.setData(initialData);
 
     annotation = new TFChartPolygon('rgba(0, 255, 255, 0.9)', 'rgba(0, 255, 255, 0.3)');
     annotation.add(TFChartPointMake(sampleData[0].timestamp, 1.0920));
@@ -51,7 +69,7 @@ $(function() {
         var endDate = $("input#endDate").val();
         var endDateObj = moment(endDate, "YYYY-MM-DD HH:mm:ss");
         
-        chart.setVisible(startDateObj.unix(), endDateObj.unix());
+        chart.setVisible(TFChartRangeMake(startDateObj.unix(), endDateObj.unix() - startDateObj.unix()));
 
         return false;
     });

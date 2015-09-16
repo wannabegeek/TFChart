@@ -9,12 +9,20 @@ function TFChartRange(position, span) {
     this.span = span;
 }
 
+TFChartRange.prototype.equal = function(x) {
+    return (x.position == this.position && x.span == this.span);
+}
+
 TFChartRange.prototype.intersects = function(x) {
     return (x >= this.position && x <= this.position + this.span);
 }
 
 TFChartRange.prototype.ratioForSize = function(x) {
     return x / this.span;    
+}
+
+function TFChartRangeMake(position, span) {
+    return new TFChartRange(position, span);
 }
 
 //////////////////////////////////////////////////////////////////
