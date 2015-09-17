@@ -22,6 +22,24 @@ TFChartDataController.prototype.setData = function(data) {
 
 TFChartDataController.prototype.processPendingRequestQueue = function(range) {
     var range = this.pending_request_queue.shift();
+    // we need to make sure we don't request the same data
+    var intersection = TFChartIntersectionRange(this.data_range, range);
+    if (intersection.span > 0) { // something intersects
+        if (TFChartEqualRanges(intersection, range)) {
+            // we already have this pending data
+            return;
+        } else {
+            // we need to update 'range'
+            if (range.position == intersection.position) {
+                // the beginning over laps
+                range.position += intersection.span;
+                range.span -= intersection.span;
+            } else if (TFChartRangeMax(range) == TFChartRangeMax(intersection)) {
+                // the end over laps
+                range.span -= intersection.position - range.position;
+            }
+        }
+    }
     this.requestData(range);
 }
 
@@ -44,7 +62,7 @@ TFChartDataController.prototype.requestData = function(range, operation, cb) {
                 self.has_pending_data_request = false;
             });
         } else {
-            console.log("No more historic data");
+            console.log("No more " + operation + " data");
             this.no_data |= operation;
         }
     } else {
@@ -52,4 +70,7 @@ TFChartDataController.prototype.requestData = function(range, operation, cb) {
         // we need to add our request to a queue
         this.pending_request_queue.push([operation, range]);               
     }
+}
+
+TFChartDataController.prototype.purgeData = function(range) {
 }

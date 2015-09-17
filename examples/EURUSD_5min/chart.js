@@ -17,11 +17,10 @@ $(function() {
         },
         controller: {
             has_data_available: function(chart, range) {
-                console.log("Requested: " + moment(range.position).format("YYYY-MM-DD HH:mm:ss") + " --> " + moment(range.position + range.span).format("YYYY-MM-DD HH:mm:ss"));
                 return ((range.position + range.span) > sampleData[0].timestamp && range.position < sampleData[sampleData.length - 1].timestamp)
             },
             fetch_data: function(chart, range, callback) {
-                console.log("Need to return more data");
+                console.log("Requested: " + moment(range.position).format("YYYY-MM-DD HH:mm:ss") + " --> " + moment(range.position + range.span).format("YYYY-MM-DD HH:mm:ss"));
                 var result = [];
                 $.each(sampleData, function(index, value) {
                     if (range.intersects(value.timestamp)) {
@@ -70,7 +69,7 @@ $(function() {
         var endDate = $("input#endDate").val();
         var endDateObj = moment(endDate, "YYYY-MM-DD HH:mm:ss");
         
-        chart.setVisible(TFChartRangeMake(startDateObj.unix(), endDateObj.unix() - startDateObj.unix()));
+        chart.setVisible(TFChartRangeMake(startDateObj.valueOf(), endDateObj.valueOf() - startDateObj.valueOf()));
 
         return false;
     });

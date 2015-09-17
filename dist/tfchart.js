@@ -3140,6 +3140,24 @@ TFChartDataController.prototype.setData = function(data) {
 
 TFChartDataController.prototype.processPendingRequestQueue = function(range) {
     var range = this.pending_request_queue.shift();
+    // we need to make sure we don't request the same data
+    var intersection = TFChartIntersectionRange(this.data_range, range);
+    if (intersection.span > 0) { // something intersects
+        if (TFChartEqualRanges(intersection, range)) {
+            // we already have this pending data
+            return;
+        } else {
+            // we need to update 'range'
+            if (range.position == intersection.position) {
+                // the beginning over laps
+                range.position += intersection.span;
+                range.span -= intersection.span;
+            } else if (TFChartRangeMax(range) == TFChartRangeMax(intersection)) {
+                // the end over laps
+                range.span -= intersection.position - range.position;
+            }
+        }
+    }
     this.requestData(range);
 }
 
@@ -3162,7 +3180,7 @@ TFChartDataController.prototype.requestData = function(range, operation, cb) {
                 self.has_pending_data_request = false;
             });
         } else {
-            console.log("No more historic data");
+            console.log("No more " + operation + " data");
             this.no_data |= operation;
         }
     } else {
@@ -3170,6 +3188,9 @@ TFChartDataController.prototype.requestData = function(range, operation, cb) {
         // we need to add our request to a queue
         this.pending_request_queue.push([operation, range]);               
     }
+}
+
+TFChartDataController.prototype.purgeData = function(range) {
 }
 
 function isNullOrUndefined(obj) {
@@ -3184,7 +3205,7 @@ function TFChartRange(position, span) {
 }
 
 TFChartRange.prototype.equal = function(x) {
-    return (x.position == this.position && x.span == this.span);
+    return TFChartEqualRanges(this, x);
 }
 
 TFChartRange.prototype.intersects = function(x) {
@@ -3195,8 +3216,37 @@ TFChartRange.prototype.ratioForSize = function(x) {
     return x / this.span;    
 }
 
+function TFChartLocationInRange(location, range) {
+    return location >= range.position && location <= TFChartRangeMax(range);
+}
+
+function TFChartRangeMax(range) {
+    return range.position + range.span;
+}
+
 function TFChartRangeMake(position, span) {
     return new TFChartRange(position, span);
+}
+
+function TFChartEqualRanges(range, otherRange) {
+    return (range.position == otherRange.position && range.span == otherRange.span);
+}
+
+function TFChartIntersectionRange() {
+    var min, loc, max1 = TFChartRangeMax(range), max2 = TFChartRangeMax(otherRange);
+    var result = TFChartRangeMake(0, 0);
+
+    min = (max1 < max2) ? max1 : max2;
+    loc = (range.position > otherRange.position) ? range.position : otherRange.position;
+
+    if (min < loc) {
+        result.position = result.span = 0;
+    } else {
+        result.position = loc;
+        result.span = min - loc;
+    }
+
+    return result;
 }
 
 //////////////////////////////////////////////////////////////////
@@ -3399,13 +3449,13 @@ function TFChart(container, renderer, options) {
         axisCanvas.onmouseout = $.proxy(this.onMouseOut, this);
 
         if (axisCanvas.addEventListener) {
-            axisCanvas.addEventListener("mousewheel", $.proxy(this.onMouseWheelScroll, this), false);
-            axisCanvas.addEventListener("DOMMouseScroll", $.proxy(this.onMouseWheelScroll, this), false);
-            axisCanvas.addEventListener("touchstart", $.proxy(this.onTouchDown, this), false);
-            axisCanvas.addEventListener("touchend", $.proxy(this.onTouchUp, this), false);
-            axisCanvas.addEventListener("touchmove", $.proxy(this.onTouchMove, this), false);
+            axisCanvas.addEventListener("mousewheel", $.proxy(this._onMouseWheelScroll, this), false);
+            axisCanvas.addEventListener("DOMMouseScroll", $.proxy(this._onMouseWheelScroll, this), false);
+            axisCanvas.addEventListener("touchstart", $.proxy(this._nTouchDown, this), false);
+            axisCanvas.addEventListener("touchend", $.proxy(this._onTouchUp, this), false);
+            axisCanvas.addEventListener("touchmove", $.proxy(this._onTouchMove, this), false);
         } else {
-            axisCanvas.attachEvent("onmousewheel", $.proxy(this.onMouseWheelScroll, this));
+            axisCanvas.attachEvent("onmousewheel", $.proxy(this._onMouseWheelScroll, this));
         }
     }
 
@@ -3428,21 +3478,15 @@ TFChart.prototype.setData = function(data) {
 }
 
 TFChart.prototype.setVisible = function(range) {
-    // start_x = start; //Math.max(start, this.data[0].timestamp);
-    // end_x = end; //ath.min(end, this.data[this.data.length - 1].timestamp);
-
     var area = this._drawableArea();
-    this.bounds = null;
-
-    var data_x_range = this.data_controller.data_range.span;
-
+    
     // this is proportion of the data which is visible
-    var ratio = range.span / data_x_range;
+    var ratio = range.span / this.data_controller.data_range.span;
     
     this.data_window.width = (area.size.width - area.origin.x) / ratio;
 
     // number of pixels per time unit (across the whole range)
-    ratio = this.data_window.width / data_x_range;
+    ratio = this.data_window.width / this.data_controller.data_range.span;
     this.data_window.origin = -(range.position - this.data_controller.data_range.position) * ratio;
 
     this._updateVisible();
@@ -3540,7 +3584,7 @@ TFChart.prototype._checkDataAvailable = function() {
         var min = self.y_axis.range.position;
         var max = min + self.y_axis.range.span;
         $.each(data, function(index, point) {
-            if (point.timestamp > self.x_axis.range.position + self.x_axis.range.span) {
+            if (point.timestamp > TFChartRangeMax(self.x_axis.range)) {
                 return;
             } else if (point.timestamp >= self.x_axis.range.position) {
                 max = Math.max(max, point.high);
@@ -3569,14 +3613,25 @@ TFChart.prototype._checkDataAvailable = function() {
     }
 
     if (this.data_window.space_right > 0.0 && this.data_controller.canSupplyData(TFChartDataRequestType.APPEND)) {
-        var range =  new TFChartRange(this.x_axis.range.position + this.x_axis.range.span, this.x_axis.range.span)
+        var range =  new TFChartRange(TFChartRangeMax(this.x_axis.range), this.x_axis.range.span)
         var self = this;
         this.data_controller.requestData(range, TFChartDataRequestType.APPEND, function(data) {
             evaluateVerticalRange(self, data);
             // we need to move our this.data_window.width & this.data_window.offset to reflect the new data
-            self.setVisible(self.x_axis.range);
-            // TODO: this is just wrong                    
-            self.data_window.space_right = 0.0;
+            var area = self._drawableArea();
+            var new_range = TFChartRangeMake(data[0].timestamp, data[data.length - 1].timestamp - data[0].timestamp);
+
+            var pct_more_data = new_range.span / (self.data_controller.data_range.span - new_range.span)
+            var extend_width_by = self.data_window.width * pct_more_data;
+            // this is proportion of the data which is visible (in the old world)
+            var ratio = range.span / (self.data_controller.data_range.span - new_range.span);
+            
+            self.data_window.width += extend_width_by;
+            self.data_window.space_right = Math.max(self.data_window.space_right - extend_width_by, 0.0);
+
+            self._updateVisible();
+            self.redraw();
+
         });
     }
 }
@@ -3837,7 +3892,7 @@ TFChart.prototype._drawCrosshair = function(point) {
     }
 }
 
-TFChart.prototype.onResize = function() {
+TFChart.prototype._onResize = function() {
     var width = this.container.width();
     var height = this.container.height();
     setCanvasSize('chart_canvas', width, height);
@@ -3849,7 +3904,7 @@ TFChart.prototype.onResize = function() {
     this.redraw();
 }
 
-TFChart.prototype.onMouseWheelScroll = function(e) {
+TFChart.prototype._onMouseWheelScroll = function(e) {
     var ev = e ? e : window.event;
     var deltaX = (e.wheelDeltaX || -e.detail);
     var deltaY = (e.wheelDeltaY || -e.detail);
@@ -3872,7 +3927,7 @@ TFChart.prototype.onMouseWheelScroll = function(e) {
     return false;
 }
 
-TFChart.prototype.onMouseMove = function(e) {
+TFChart.prototype._onMouseMove = function(e) {
     var ev = e ? e : window.event;
     mouseX = ev.pageX - this.crosshair_canvas.offset().left;
     mouseY = ev.pageY - this.crosshair_canvas.offset().top;
@@ -3889,13 +3944,13 @@ TFChart.prototype.onMouseMove = function(e) {
     return false;
 }
 
-TFChart.prototype.onMouseOut = function(e) {
+TFChart.prototype._onMouseOut = function(e) {
     this._removeCrosshair();
     this.isMouseDown = false;
     this.crosshair_canvas.css('cursor', 'crosshair');
 }
 
-TFChart.prototype.onMouseDown = function(e) {
+TFChart.prototype._onMouseDown = function(e) {
     var ev = e ? e : window.event;
     mouseX = ev.pageX - this.crosshair_canvas.offset().left;
     mouseY = ev.pageY - this.crosshair_canvas.offset().top;
@@ -3908,7 +3963,7 @@ TFChart.prototype.onMouseDown = function(e) {
     return false;
 }
 
-TFChart.prototype.onMouseUp = function(e) {
+TFChart.prototype._onMouseUp = function(e) {
     this.isMouseDown = false;
     this.crosshair_canvas.css('cursor', 'crosshair');
     e.preventDefault();
@@ -3916,7 +3971,7 @@ TFChart.prototype.onMouseUp = function(e) {
     return false;
 }
 
-TFChart.prototype.onTouchMove = function(e) {
+TFChart.prototype._onTouchMove = function(e) {
     var ev = e ? e : window.event;
     var touchX = e.targetTouches[0].pageX - this.crosshair_canvas.offset().left;
     if (e.targetTouches.length == 1) { // we are panning
@@ -3941,7 +3996,7 @@ TFChart.prototype.onTouchMove = function(e) {
     return false;
 }
 
-TFChart.prototype.onTouchDown = function(e) {
+TFChart.prototype._onTouchDown = function(e) {
     var ev = e ? e : window.event;
     len = e.targetTouches.length;
     var touchX = e.targetTouches[0].pageX - this.crosshair_canvas.offset().left;
@@ -3962,7 +4017,7 @@ TFChart.prototype.onTouchDown = function(e) {
     return false;
 }
 
-TFChart.prototype.onTouchUp = function(e) {
+TFChart.prototype._onTouchUp = function(e) {
     this.isTouchDown = false;
 
     e.preventDefault();

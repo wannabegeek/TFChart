@@ -9,8 +9,12 @@ function TFChartRange(position, span) {
     this.span = span;
 }
 
+function TFChartRangeMake(position, span) {
+    return new TFChartRange(position, span);
+}
+
 TFChartRange.prototype.equal = function(x) {
-    return (x.position == this.position && x.span == this.span);
+    return TFChartEqualRanges(this, x);
 }
 
 TFChartRange.prototype.intersects = function(x) {
@@ -21,8 +25,33 @@ TFChartRange.prototype.ratioForSize = function(x) {
     return x / this.span;    
 }
 
-function TFChartRangeMake(position, span) {
-    return new TFChartRange(position, span);
+function TFChartLocationInRange(location, range) {
+    return location >= range.position && location <= TFChartRangeMax(range);
+}
+
+function TFChartRangeMax(range) {
+    return range.position + range.span;
+}
+
+function TFChartEqualRanges(range, otherRange) {
+    return (range.position == otherRange.position && range.span == otherRange.span);
+}
+
+function TFChartIntersectionRange() {
+    var min, loc, max1 = TFChartRangeMax(range), max2 = TFChartRangeMax(otherRange);
+    var result = TFChartRangeMake(0, 0);
+
+    min = (max1 < max2) ? max1 : max2;
+    loc = (range.position > otherRange.position) ? range.position : otherRange.position;
+
+    if (min < loc) {
+        result.position = result.span = 0;
+    } else {
+        result.position = loc;
+        result.span = min - loc;
+    }
+
+    return result;
 }
 
 //////////////////////////////////////////////////////////////////
@@ -32,12 +61,12 @@ function TFChartPoint(x, y) {
     this.y = y;
 }
 
-TFChartPoint.prototype.toString = function() {
-    return "{x: " + this.x + ", y: " + this.y + "}";
-}
-
 function TFChartPointMake(x, y) {
     return new TFChartPoint(x, y);
+}
+
+TFChartPoint.prototype.toString = function() {
+    return "{x: " + this.x + ", y: " + this.y + "}";
 }
 
 //////////////////////////////////////////////////////////////////
@@ -58,6 +87,10 @@ function TFChartRect(origin, size) {
     this.size = size;
 }
 
+function TFChartRectMake(x, y, w, h) {
+    return new TFChartRect(new TFChartPoint(x, y), new TFChartSize(w, h));
+}
+
 TFChartRect.prototype.toString = function() {
     return "origin: " + this.origin + ", size: " + this.size;
 }
@@ -69,8 +102,4 @@ TFChartRect.prototype.containsPoint = function(point) {
 
 TFChartRect.prototype.intersectsRect = function(rect) {
     return (this.origin.x + this.size.width >= rect.origin.x && this.origin.x <= rect.origin.x + rect.size.width && this.origin.y + this.size.height >= rect.origin.y && this.origin.y <= rect.origin.y + rect.size.height);
-}
-
-function TFChartRectMake(x, y, w, h) {
-    return new TFChartRect(new TFChartPoint(x, y), new TFChartSize(w, h));
 }
