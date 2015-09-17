@@ -3016,13 +3016,13 @@ function log10(val) {
 
 function DateTimeAxisFormatter() {
     this.timeUnitSize = {
-        "second": 1,
-        "minute": 60 * 1,
-        "hour": 60 * 60 * 1,
-        "day": 24 * 60 * 60 * 1,
-        "month": 30 * 24 * 60 * 60 * 1,
-        "quarter": 3 * 30 * 24 * 60 * 60 * 1,
-        "year": 365.2425 * 24 * 60 * 60 * 1
+        "second": 1000,
+        "minute": 60 * 1000,
+        "hour": 60 * 60 * 1000,
+        "day": 24 * 60 * 60 * 1000,
+        "month": 30 * 24 * 60 * 60 * 1000,
+        "quarter": 3 * 30 * 24 * 60 * 60 * 1000,
+        "year": 365.2425 * 24 * 60 * 60 * 1000
     };
 
     // the allowed tick sizes, after 1 year we use
@@ -3113,6 +3113,62 @@ DateTimeAxisFormatter.prototype.format = function(value, axis, is_crosshair) {
         }
 
         return {text: moment(value).utc().format(fmt), is_key: is_key};
+    }
+}
+
+var TFChartDataRequestType = Object.freeze({
+    PREPEND: 1,
+    APPEND: 2
+});
+
+function TFChartDataController(chart, controller) {
+    this.chart = chart;
+    this.controller = controller;
+    this.data = [];
+
+    this.has_pending_data_request = false;
+    this.pending_request_queue = [];
+
+    this.no_data = 0;
+    this.data_range = null;
+}
+
+TFChartDataController.prototype.setData = function(data) {
+    this.data = data;
+    this.data_range = new TFChartRange(this.data[0].timestamp, this.data[this.data.length - 1].timestamp - this.data[0].timestamp);
+}
+
+TFChartDataController.prototype.processPendingRequestQueue = function(range) {
+    var range = this.pending_request_queue.shift();
+    this.requestData(range);
+}
+
+TFChartDataController.prototype.canSupplyData = function(operation) {
+    return !isNullOrUndefined(this.controller) && (this.no_data & operation) != operation;
+}
+
+TFChartDataController.prototype.requestData = function(range, operation, cb) {
+    if (this.has_pending_data_request === false) {
+        if (this.controller.has_data_available(this.chart, range)) {
+            this.has_pending_data_request = true;
+            var self = this;
+            this.controller.fetch_data(this.chart, range, function(data) {
+                if (operation === TFChartDataRequestType.PREPEND) {
+                    self.setData(data.concat(self.data));
+                } else {
+                    self.setData(self.data.concat(data));
+                }
+                cb(data);
+                self.has_pending_data_request = false;
+            });
+        } else {
+            console.log("No more historic data");
+            this.no_data |= operation;
+        }
+    } else {
+        console.log("Data request already in progress");
+        // we need to add our request to a queue
+        this.pending_request_queue.push([operation, range]);               
     }
 }
 
@@ -3295,8 +3351,6 @@ function TFChart(container, renderer, options) {
     this.renderer = renderer;
     this.viewable_range = new TFChartRange(0.0, 0.0);
 
-    this.data = [];
-
     this.annotations = [];
 
     this.data_window = new TFChartWindow(0.0, 0.0, this.options.space_right);
@@ -3309,6 +3363,8 @@ function TFChart(container, renderer, options) {
     this.drag_start = 0.0;
     this.touch_start = 0.0;
     this.touch_delta = 0.0;
+
+    this.data_controller = new TFChartDataController(this, this.options.controller);
 
     this.container = $(container);
 
@@ -3366,7 +3422,7 @@ TFChart.prototype.setPeriod = function(period) {
 }
 
 TFChart.prototype.setData = function(data) {
-    this.data = data;
+    this.data_controller.setData(data);
     this._updateVisible();
     this.redraw();
 }
@@ -3378,7 +3434,7 @@ TFChart.prototype.setVisible = function(range) {
     var area = this._drawableArea();
     this.bounds = null;
 
-    var data_x_range = this.data[this.data.length - 2].timestamp - this.data[0].timestamp;
+    var data_x_range = this.data_controller.data_range.span;
 
     // this is proportion of the data which is visible
     var ratio = range.span / data_x_range;
@@ -3387,7 +3443,7 @@ TFChart.prototype.setVisible = function(range) {
 
     // number of pixels per time unit (across the whole range)
     ratio = this.data_window.width / data_x_range;
-    this.data_window.origin = -(range.position - this.data[1].timestamp) * ratio;
+    this.data_window.origin = -(range.position - this.data_controller.data_range.position) * ratio;
 
     this._updateVisible();
     this.redraw();
@@ -3475,68 +3531,53 @@ TFChart.prototype.zoom = function(delta, preventRedraw) {
 ////////////// END PUBLIC METHODS /////////////
 
 TFChart.prototype._checkDataAvailable = function() {
-    if (typeof this.options.controller !== 'undefined') {
-        var evaluateVerticalRange = function(data) {
-            var min = self.y_axis.range.position;
-            var max = min + self.y_axis.range.span;
-            $.each(data, function(index, point) {
-                if (point.timestamp > self.x_axis.range.position + self.x_axis.range.span) {
-                    return;
-                } else if (point.timestamp >= self.x_axis.range.position) {
-                    max = Math.max(max, point.high);
-                    min = Math.min(min, point.low);
-                }
-            });
-            var delta = max - min;
-            var y_range = new TFChartRange(min, max - min);
-            if (!self.y_axis.range.equal(y_range)) {
-                self.y_axis.range = y_range;
-                if (self.options.view_range !== null) {
-                    self.options.view_range(self, self.x_axis.range, self.y_axis.range);
-                }
+    var DataRequestType = Object.freeze({
+        PREPEND: 0,
+        APPEND: 1
+    });
+
+    var evaluateVerticalRange = function(self, data) {
+        var min = self.y_axis.range.position;
+        var max = min + self.y_axis.range.span;
+        $.each(data, function(index, point) {
+            if (point.timestamp > self.x_axis.range.position + self.x_axis.range.span) {
+                return;
+            } else if (point.timestamp >= self.x_axis.range.position) {
+                max = Math.max(max, point.high);
+                min = Math.min(min, point.low);
             }
-        };
-
-        if (this.data_window.origin > 0.0 && isNullOrUndefined(this.no_historic_data)) {
-            var range =  new TFChartRange(this.x_axis.range.position - this.x_axis.range.span, this.x_axis.range.span)
-            if (this.options.controller.has_data_available(this, range)) {
-                var self = this;
-                this.options.controller.fetch_data(this, range, function(data) {
-                    self.data = data.concat(self.data);
-                    var current_range = self.x_axis.range;
-                    // we need to move our this.data_window.width & this.data_window.space_to_right to reflect the new data
-                    self.setVisible(self.x_axis.range);
-
-                    // only scan our new data
-                    evaluateVerticalRange(data);
-                    self.redraw();
-                });
-            } else {
-                // no more historical data available
-                this.no_historic_data = true;
+        });
+        var delta = max - min;
+        var y_range = new TFChartRange(min, max - min);
+        if (!self.y_axis.range.equal(y_range)) {
+            self.y_axis.range = y_range;
+            if (self.options.view_range !== null) {
+                self.options.view_range(self, self.x_axis.range, self.y_axis.range);
             }
         }
-        if (this.data_window.space_right > 0.0 && isNullOrUndefined(this.no_future_data)) {
-            var range =  new TFChartRange(this.x_axis.range.position + this.x_axis.range.span, this.x_axis.range.span)
-            if (this.options.controller.has_data_available(this, range)) {
-                var self = this;
-                this.options.controller.fetch_data(this, range, function(data) {
-                    self.data = self.data.concat(data);
-                    var current_range = self.x_axis.range;
-                    // we need to move our this.data_window.width & this.data_window.offset to reflect the new data
-                    self.setVisible(self.x_axis.range);
-                    // TODO: this is just wrong                    
-                    self.data_window.space_right = 0.0;
+    };
 
-                    // only scan our new data
-                    evaluateVerticalRange(data);
-                    self.redraw();
-                });
-            } else {
-                // no more historical data available
-                this.no_future_data = true;
-            }
-        }
+    if (this.data_window.origin > 0.0 && this.data_controller.canSupplyData(TFChartDataRequestType.PREPEND)) {
+        var range =  new TFChartRange(this.x_axis.range.position - this.x_axis.range.span, this.x_axis.range.span)
+        var self = this;
+        this.data_controller.requestData(range, TFChartDataRequestType.PREPEND, function(data) {
+            evaluateVerticalRange(self, data);
+            var current_range = self.x_axis.range;
+            // we need to move our this.data_window.width & this.data_window.space_to_right to reflect the new data
+            self.setVisible(self.x_axis.range);
+        });
+    }
+
+    if (this.data_window.space_right > 0.0 && this.data_controller.canSupplyData(TFChartDataRequestType.APPEND)) {
+        var range =  new TFChartRange(this.x_axis.range.position + this.x_axis.range.span, this.x_axis.range.span)
+        var self = this;
+        this.data_controller.requestData(range, TFChartDataRequestType.APPEND, function(data) {
+            evaluateVerticalRange(self, data);
+            // we need to move our this.data_window.width & this.data_window.offset to reflect the new data
+            self.setVisible(self.x_axis.range);
+            // TODO: this is just wrong                    
+            self.data_window.space_right = 0.0;
+        });
     }
 }
 
@@ -3584,17 +3625,17 @@ TFChart.prototype._updateVisible = function() {
     var area = this._drawableArea();
     this.bounds = null;
 
-    var data_x_range = this.data[this.data.length - 1].timestamp - this.data[0].timestamp;
+    var data_x_range = this.data_controller.data_range.span;
 
     // this is the pixels per time unit
     var ratio = this.data_window.width / data_x_range;
-    var end_x = this._periodCeil(((area.size.width - area.origin.x - this.data_window.origin) / ratio + this.data[0].timestamp));
+    var end_x = this._periodCeil(((area.size.width - area.origin.x - this.data_window.origin) / ratio + this.data_controller.data_range.position));
     var offset = (area.size.width - this.data_window.space_right) / ratio;
     start_x = this._periodFloor(Math.floor(end_x - offset));
 
     var min = null;
     var max = null;
-    $.each(this.data, function(index, point) {
+    $.each(this.data_controller.data, function(index, point) {
         if (point.timestamp > end_x) {
             return;
         } else if (point.timestamp >= start_x) {
@@ -3690,13 +3731,13 @@ TFChart.prototype._drawAxis = function() {
 }
 
 TFChart.prototype._drawPlot = function() {
-    if (this.data.length > 0) {
+    if (this.data_controller.data.length > 0) {
 
         var area = this._plotArea();
         this.context.save();
         this.context.rect(area.origin.x, area.origin.y, area.size.width, area.size.height);
         this.context.clip();
-        this.renderer.render(this.data, this);
+        this.renderer.render(this.data_controller.data, this);
         this.context.restore();
     }
 }

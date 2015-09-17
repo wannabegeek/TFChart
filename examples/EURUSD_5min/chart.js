@@ -28,7 +28,8 @@ $(function() {
                         result.push(value);
                     }
                 });
-                callback(result);
+                setTimeout(callback, 3000, result);
+                //callback(result);
             }
         }
     };

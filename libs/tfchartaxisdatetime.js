@@ -4,13 +4,13 @@ function log10(val) {
 
 function DateTimeAxisFormatter() {
     this.timeUnitSize = {
-        "second": 1,
-        "minute": 60 * 1,
-        "hour": 60 * 60 * 1,
-        "day": 24 * 60 * 60 * 1,
-        "month": 30 * 24 * 60 * 60 * 1,
-        "quarter": 3 * 30 * 24 * 60 * 60 * 1,
-        "year": 365.2425 * 24 * 60 * 60 * 1
+        "second": 1000,
+        "minute": 60 * 1000,
+        "hour": 60 * 60 * 1000,
+        "day": 24 * 60 * 60 * 1000,
+        "month": 30 * 24 * 60 * 60 * 1000,
+        "quarter": 3 * 30 * 24 * 60 * 60 * 1000,
+        "year": 365.2425 * 24 * 60 * 60 * 1000
     };
 
     // the allowed tick sizes, after 1 year we use
