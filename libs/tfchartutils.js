@@ -37,21 +37,21 @@ function TFChartEqualRanges(range, otherRange) {
     return (range.position == otherRange.position && range.span == otherRange.span);
 }
 
-function TFChartIntersectionRange() {
-    var min, loc, max1 = TFChartRangeMax(range), max2 = TFChartRangeMax(otherRange);
+function TFChartIntersectionRange(range, otherRange) {
     var result = TFChartRangeMake(0, 0);
 
-    min = (max1 < max2) ? max1 : max2;
-    loc = (range.position > otherRange.position) ? range.position : otherRange.position;
-
-    if (min < loc) {
-        result.position = result.span = 0;
+    if (TFChartRangeMax(range) < otherRange.position || TFChartRangeMax(otherRange) < range.position) {
+        return TFChartRangeMake(0, 0);
     } else {
-        result.position = loc;
-        result.span = min - loc;
+        result.position = Math.max(range.position, otherRange.position);
+        result.span   = Math.min(TFChartRangeMax(range), TFChartRangeMax(otherRange)) - result.position;
+        return result;
     }
+}
 
-    return result;
+function TFChartUnionRange(range, otherRange) {
+    var start = Math.min(range.position, otherRange.position);
+    return TFChartRangeMake(start, Math.max(TFChartRangeMax(range), TFChartRangeMax(otherRange)) - start);
 }
 
 //////////////////////////////////////////////////////////////////

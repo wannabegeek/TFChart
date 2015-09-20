@@ -6,61 +6,6 @@ function setCanvasSize(canvasId, x, y) {
 
 //////////////////////////////////////////////////////////////////
 
-function TFChartWindow(origin, width, space_right) {
-    this.origin = origin;
-    this.width = width;
-    this.space_right = space_right;
-}
-
-TFChartWindow.prototype._checkLimits = function(area) {
-    this.space_right = Math.min(area.size.width * 0.5, this.space_right);
-    this.space_right = Math.max(0.0, this.space_right);
-
-    // no smaller than the current window width
-    this.width = Math.max(this.width, area.size.width);
-
-    // origin cannot be +'ve' (i.e. have space to left)
-    this.origin = Math.min(area.size.width/2.0, this.origin);
-    // and you can't have space to the right
-    this.origin = Math.max(-(this.width - area.size.width), this.origin)
-}
-
-TFChartWindow.prototype.move = function(delta, area) {
-
-    if (this.origin + delta < -(this.width - area.size.width)) {
-        this.space_right -= delta;
-    } else if (this.space_right > 0 && delta > 0.0) {
-        this.space_right -= delta;
-    } else {
-        this.origin += delta;
-    }
-
-    this._checkLimits(area);
-}
-
-TFChartWindow.prototype.zoom = function(delta, area) {
-
-    var to_right = this.width - area.size.width + this.origin;
-
-    var r = to_right / this.width;
-
-    this.origin -= delta;
-    // this.origin = Math.min(0.0, this.origin);
-
-    this.width = -this.origin + area.size.width + to_right + delta;
-    this.width = Math.max(this.width, area.size.width);
-
-    var delta_to_right = ((this.width - area.size.width + this.origin) / this.width) - r;
-
-    // delta_to_right = Math.max(0.0, delta_to_right);
-
-    this.origin -= delta_to_right * this.width;
-
-    this._checkLimits(area);
-}
-
-//////////////////////////////////////////////////////////////////
-
 function TFChart(container, renderer, options) {
     var defaults = {
         theme: {
@@ -72,8 +17,9 @@ function TFChart(container, renderer, options) {
             crosshairColor: "#999999"
         },
         min_data_points: 15,
-        max_data_points: 500,
+        max_data_points: 1000,
         space_right: 0.0,
+        initial_data_points: 100,
         view_range: null,
         controller: null
     };
@@ -87,8 +33,7 @@ function TFChart(container, renderer, options) {
         formatter: new DateTimeAxisFormatter(),
         padding: 70.0,
         data_padding: 0.0,
-        range: new TFChartRange(0.0, 0.0),
-        pixels_per_unit = 0
+        range: new TFChartRange(0.0, 0.0)
     };
 
     this.y_axis = {
@@ -103,7 +48,9 @@ function TFChart(container, renderer, options) {
 
     this.annotations = [];
 
-    this.data_window = new TFChartWindow(0.0, 0.0, this.options.space_right);
+    this.visible_offset = 0.0;
+    this.visible_data_points = this.options.initial_data_points;
+    this.period = 300000;
 
     this.context = null;
     this.axis_context = null;
@@ -114,7 +61,19 @@ function TFChart(container, renderer, options) {
     this.touch_start = 0.0;
     this.touch_delta = 0.0;
 
-    this.data_controller = new TFChartDataController(this, this.options.controller);
+    var self = this;
+    this.data_controller = new TFChartDataController(this, this.options.controller, this.period, function(data, operation) {
+        if (operation === TFChartDataRequestType.PREPEND) {
+            self._reevaluateVerticalRange(data);
+            self.visible_offset -= data.length;
+            // self._updateVisible();
+            self.redraw();
+        } else {
+            self._reevaluateVerticalRange(data);
+            // self._updateVisible();
+            self.redraw();
+        }
+    });
 
     this.container = $(container);
 
@@ -143,10 +102,10 @@ function TFChart(container, renderer, options) {
         // Initaliase a 2-dimensional drawing context
         this.axis_context = axisCanvas.getContext('2d');
 
-        axisCanvas.onmousedown = $.proxy(this.onMouseDown, this);
-        axisCanvas.onmouseup = $.proxy(this.onMouseUp, this);
-        axisCanvas.onmousemove = $.proxy(this.onMouseMove, this);
-        axisCanvas.onmouseout = $.proxy(this.onMouseOut, this);
+        axisCanvas.onmousedown = $.proxy(this._onMouseDown, this);
+        axisCanvas.onmouseup = $.proxy(this._onMouseUp, this);
+        axisCanvas.onmousemove = $.proxy(this._onMouseMove, this);
+        axisCanvas.onmouseout = $.proxy(this._onMouseOut, this);
 
         if (axisCanvas.addEventListener) {
             axisCanvas.addEventListener("mousewheel", $.proxy(this._onMouseWheelScroll, this), false);
@@ -159,16 +118,14 @@ function TFChart(container, renderer, options) {
         }
     }
 
-    new ResizeSensor(this.container, $.proxy(this.onResize, this));
-
-    var area = this._drawableArea();
-    this.data_window = new TFChartWindow(0.0, area.size.width, this.options.space_right);
+    new ResizeSensor(this.container, $.proxy(this._onResize, this));
 
     this.redraw();
 }
 
 TFChart.prototype.setPeriod = function(period) {
     this.period = period;
+    this.data_controller.setPeriod(this.period);
 }
 
 TFChart.prototype.setData = function(data) {
@@ -180,15 +137,13 @@ TFChart.prototype.setData = function(data) {
 TFChart.prototype.setVisible = function(range) {
     var area = this._drawableArea();
     
-    // this is proportion of the data which is visible
-    var ratio = range.span / this.data_controller.data_range.span;
-    
-    this.data_window.width = (area.size.width - area.origin.x) / ratio;
+    this.visible_data_points = range.span / this.period;
 
     // number of pixels per time unit (across the whole range)
-    ratio = this.data_window.width / this.data_controller.data_range.span;
-    this.data_window.origin = -(range.position - this.data_controller.data_range.position) * ratio;
+    var ratio = area.size.width / this.visible_data_points;
+    this.visible_offset = ((this.data_controller.data_range.position - range.position) * ratio) / this.period;
 
+    this._checkViewableLimits();
     this._updateVisible();
     this.redraw();
 }
@@ -198,16 +153,16 @@ TFChart.prototype.doesXValueIntersectVisible = function(x) {
 }
 
 TFChart.prototype.reset = function() {
-    var area = this._drawableArea();
-    this.data_window = new TFChartWindow(0.0, area.size.width, this.options.space_right);
+    this.visible_offset = 0.0;
+    this.visible_data_points = this.options.initial_data_points;
     this._updateVisible();
     this.redraw();
 }
 
 TFChart.prototype.pixelValueAtXValue = function(x) {
     var area = this._drawableArea();
-    var x_ratio = this.x_axis.range.ratioForSize(area.size.width - area.origin.x - this.data_window.space_right);
-    return (x - this.x_axis.range.position) * x_ratio + area.origin.x;
+    var ppdp = area.size.width / this.visible_data_points;
+    return ((x - this.data_controller.data_range.position) / this.period) * ppdp + (this.visible_offset * ppdp);
 }
 
 TFChart.prototype.pixelValueAtYValue = function(y) {
@@ -218,11 +173,10 @@ TFChart.prototype.pixelValueAtYValue = function(y) {
 
 TFChart.prototype.valueAtPixelLocation = function(point) {
     var area = this._drawableArea();
-
-    var x_ratio = this.x_axis.range.ratioForSize(area.size.width - area.origin.x - this.data_window.space_right);
     var y_ratio = this.y_axis.range.ratioForSize(area.size.height);
-
-    return TFChartPointMake(((point.x - area.origin.x) / x_ratio) + this.x_axis.range.position, (((area.size.height + area.origin.y) - point.y) / y_ratio) + this.y_axis.range.position);
+    var ppdp = area.size.width / this.visible_data_points;
+    var x_value = ((point.x / ppdp) - this.visible_offset) * this.period + this.data_controller.data_range.position;
+    return TFChartPointMake(x_value, (((area.size.height + area.origin.y) - point.y) / y_ratio) + this.y_axis.range.position);
 }
 
 TFChart.prototype.addAnnotation = function(annotation) {
@@ -255,7 +209,11 @@ TFChart.prototype.redraw = function() {
 }
 
 TFChart.prototype.pan = function(delta, preventRedraw) {
-    this.data_window.move(delta, this._plotArea());
+    var area = this._drawableArea();
+
+    this.visible_offset += (delta / area.size.width) * this.visible_data_points;
+    this._checkViewableLimits();
+
     if (preventRedraw != true) {
         this._updateVisible();
         this.redraw();
@@ -264,7 +222,15 @@ TFChart.prototype.pan = function(delta, preventRedraw) {
 }
 
 TFChart.prototype.zoom = function(delta, preventRedraw) {
-    this.data_window.zoom(delta, this._plotArea());
+    var area = this._drawableArea();
+    var move = (delta / area.size.width) * this.visible_data_points;
+    this.visible_data_points += move;
+    if (this._checkViewableRangeLimits()) {
+        this.visible_offset += move;
+        this._checkViewableOffsetLimits();
+    }
+
+
     if (preventRedraw != true) {
         this._updateVisible();
         this.redraw();
@@ -275,65 +241,64 @@ TFChart.prototype.zoom = function(delta, preventRedraw) {
 ////////////// END PUBLIC METHODS /////////////
 
 TFChart.prototype._checkDataAvailable = function() {
-    var DataRequestType = Object.freeze({
-        PREPEND: 0,
-        APPEND: 1
-    });
+    if (this.visible_offset > 0.0 && this.data_controller.canSupplyData(TFChartDataRequestType.PREPEND)) {
+        var start_x = this.x_axis.range.position - this.x_axis.range.span;
+        var range =  new TFChartRange(start_x, this.data_controller.data_range.position - start_x - this.period);
+        this.data_controller.requestData(range, TFChartDataRequestType.PREPEND);
+    }
 
-    var evaluateVerticalRange = function(self, data) {
-        var min = self.y_axis.range.position;
-        var max = min + self.y_axis.range.span;
-        $.each(data, function(index, point) {
-            if (point.timestamp > TFChartRangeMax(self.x_axis.range)) {
-                return;
-            } else if (point.timestamp >= self.x_axis.range.position) {
-                max = Math.max(max, point.high);
-                min = Math.min(min, point.low);
-            }
-        });
-        var delta = max - min;
-        var y_range = new TFChartRange(min, max - min);
-        if (!self.y_axis.range.equal(y_range)) {
-            self.y_axis.range = y_range;
-            if (self.options.view_range !== null) {
-                self.options.view_range(self, self.x_axis.range, self.y_axis.range);
-            }
+    if (this.visible_data_points - this.visible_offset > this.data_controller.data.length && this.data_controller.canSupplyData(TFChartDataRequestType.APPEND)) {
+        var range =  new TFChartRange(TFChartRangeMax(this.data_controller.data_range) + this.period, this.x_axis.range.span)
+        this.data_controller.requestData(range, TFChartDataRequestType.APPEND);
+    }
+}
+
+TFChart.prototype._reevaluateVerticalRange = function(data) {
+    var min = this.y_axis.range.position;
+    var max = min + this.y_axis.range.span;
+    var self = this;
+    $.each(data, function(index, point) {
+        if (point.timestamp > TFChartRangeMax(self.x_axis.range)) {
+            return;
+        } else if (point.timestamp >= self.x_axis.range.position) {
+            max = Math.max(max, point.high);
+            min = Math.min(min, point.low);
         }
-    };
+    });
+    var delta = max - min;
+    var y_range = new TFChartRange(min, max - min);
+    if (!this.y_axis.range.equal(y_range)) {
+        this.y_axis.range = y_range;
+        if (this.options.view_range !== null) {
+            this.options.view_range(this, this.x_axis.range, this.y_axis.range);
+        }
+    }
+};
 
-    if (this.data_window.origin > 0.0 && this.data_controller.canSupplyData(TFChartDataRequestType.PREPEND)) {
-        var range =  new TFChartRange(this.x_axis.range.position - this.x_axis.range.span, this.x_axis.range.span)
-        var self = this;
-        this.data_controller.requestData(range, TFChartDataRequestType.PREPEND, function(data) {
-            evaluateVerticalRange(self, data);
-            var current_range = self.x_axis.range;
-            // we need to move our this.data_window.width & this.data_window.space_to_right to reflect the new data
-            self.setVisible(self.x_axis.range);
-        });
+TFChart.prototype._checkViewableRangeLimits = function() {
+    var result = Math.max(this.visible_data_points, this.options.min_data_points);
+    result = Math.min(result, this.options.max_data_points);
+
+    var restricted = (this.visible_data_points === result);
+    this.visible_data_points = result;
+    return restricted;
+}
+
+TFChart.prototype._checkViewableOffsetLimits = function() {
+    var area = this._drawableArea();
+    if (this.visible_offset > 0.0) {
+        result = Math.min(this.visible_offset, this.visible_data_points / 2.0);
+    } else {
+        result = Math.max(this.visible_offset, -(this.data_controller.data.length - (this.visible_data_points / 2.0)));
     }
 
-    if (this.data_window.space_right > 0.0 && this.data_controller.canSupplyData(TFChartDataRequestType.APPEND)) {
-        var range =  new TFChartRange(TFChartRangeMax(this.x_axis.range), this.x_axis.range.span)
-        var self = this;
-        this.data_controller.requestData(range, TFChartDataRequestType.APPEND, function(data) {
-            evaluateVerticalRange(self, data);
-            // we need to move our this.data_window.width & this.data_window.offset to reflect the new data
-            var area = self._drawableArea();
-            var new_range = TFChartRangeMake(data[0].timestamp, data[data.length - 1].timestamp - data[0].timestamp);
+    var restricted = (this.visible_offset === result);
+    this.visible_offset = result;
+    return restricted;
+}
 
-            var pct_more_data = new_range.span / (self.data_controller.data_range.span - new_range.span)
-            var extend_width_by = self.data_window.width * pct_more_data;
-            // this is proportion of the data which is visible (in the old world)
-            var ratio = range.span / (self.data_controller.data_range.span - new_range.span);
-            
-            self.data_window.width += extend_width_by;
-            self.data_window.space_right = Math.max(self.data_window.space_right - extend_width_by, 0.0);
-
-            self._updateVisible();
-            self.redraw();
-
-        });
-    }
+TFChart.prototype._checkViewableLimits = function() {
+    return this._checkViewableRangeLimits() && this._checkViewableOffsetLimits();
 }
 
 TFChart.prototype._periodFloor = function(value) {
@@ -378,15 +343,11 @@ TFChart.prototype._plotArea = function() {
 
 TFChart.prototype._updateVisible = function() {
     var area = this._drawableArea();
-    this.bounds = null;
 
-    var data_x_range = this.data_controller.data_range.span;
-
-    // this is the pixels per time unit
-    var ratio = this.data_window.width / data_x_range;
-    var end_x = this._periodCeil(((area.size.width - area.origin.x - this.data_window.origin) / ratio + this.data_controller.data_range.position));
-    var offset = (area.size.width - this.data_window.space_right) / ratio;
-    start_x = this._periodFloor(Math.floor(end_x - offset));
+    var ppdp = area.size.width / this.visible_data_points;
+    var offset = this.visible_offset * this.period;
+    var start_x = this._periodFloor(this.data_controller.data_range.position - offset + (this.period / 2.0));
+    var end_x = this._periodCeil(this.data_controller.data_range.position - offset - (this.period / 2.0) + ((area.size.width / ppdp) * this.period));
 
     var min = null;
     var max = null;
