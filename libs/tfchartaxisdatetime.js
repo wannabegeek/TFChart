@@ -4,13 +4,13 @@ function log10(val) {
 
 function DateTimeAxisFormatter() {
     this.timeUnitSize = {
-        "second": 1,
-        "minute": 60 * 1,
-        "hour": 60 * 60 * 1,
-        "day": 24 * 60 * 60 * 1,
-        "month": 30 * 24 * 60 * 60 * 1,
-        "quarter": 3 * 30 * 24 * 60 * 60 * 1,
-        "year": 365.2425 * 24 * 60 * 60 * 1
+        "second": 1000,
+        "minute": 60 * 1000,
+        "hour": 60 * 60 * 1000,
+        "day": 24 * 60 * 60 * 1000,
+        "month": 30 * 24 * 60 * 60 * 1000,
+        "quarter": 3 * 30 * 24 * 60 * 60 * 1000,
+        "year": 365.2425 * 24 * 60 * 60 * 1000
     };
 
     // the allowed tick sizes, after 1 year we use
@@ -68,7 +68,7 @@ DateTimeAxisFormatter.prototype.calculateAxisTicks = function(axis, count) {
 DateTimeAxisFormatter.prototype.format = function(value, axis, is_crosshair) {
     // var m = new Moment();
     if (is_crosshair == true) {
-        return {text: moment(value * 1000).utc().format("YYYY-MM-DD HH:mm:ss"), is_key:false};
+        return {text: moment(value).utc().format("YYYY-MM-DD HH:mm:ss"), is_key:false};
     } else {
 
         var t = axis.tickSize;
@@ -100,6 +100,6 @@ DateTimeAxisFormatter.prototype.format = function(value, axis, is_crosshair) {
             is_key = true;
         }
 
-        return {text: moment(value * 1000).utc().format(fmt), is_key: is_key};
+        return {text: moment(value).utc().format(fmt), is_key: is_key};
     }
 }
