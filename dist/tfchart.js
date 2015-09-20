@@ -2927,7 +2927,7 @@ function TFChartHorizontalRay(lineColor, start) {
 }
 
 TFChartHorizontalRay.prototype.render = function(bounds, chart_view) {
-    if (this.point.x <= bounds.origin.x + bounds.size.width && this.point.y >= bounds.origin.y - bounds.size.height && this.point.y <= bounds.origin.y) {
+    if (this.point.x <= TFChartRectGetMaxX(bounds) && this.point.y <= TFChartRectGetMaxY(bounds) && this.point.y >= TFChartRectGetMinY(bounds)) {
         var ctx = chart_view.context;
         var plot = chart_view._plotArea();
         ctx.beginPath();
@@ -2951,7 +2951,7 @@ function TFChartVerticalRay(lineColor, start, is_down) {
 }
 
 TFChartVerticalRay.prototype.render = function(bounds, chart_view) {
-    if (this.point.x <= bounds.origin.x + bounds.size.width && this.point.x >= bounds.origin.x && ((!this.direction_down && this.point.y >= bounds.origin.y - bounds.size.height) || (this.direction_down && this.point.y >= bounds.origin.y))) {
+    if (this.point.x <= TFChartRectGetMaxX(bounds) && this.point.x >= bounds.origin.x && ((!this.direction_down && this.point.y >= bounds.origin.y - bounds.size.height) || (this.direction_down && this.point.y >= bounds.origin.y))) {
         var ctx = chart_view.context;
         var plot = chart_view._plotArea();
         ctx.beginPath();
@@ -3336,6 +3336,22 @@ TFChartRect.prototype.intersectsRect = function(rect) {
     return (this.origin.x + this.size.width >= rect.origin.x && this.origin.x <= rect.origin.x + rect.size.width && this.origin.y + this.size.height >= rect.origin.y && this.origin.y <= rect.origin.y + rect.size.height);
 }
 
+function TFChartRectGetMinX(rect) {
+    return rect.origin.x;
+}
+
+function TFChartRectGetMaxX(rect) {
+    return rect.origin.x + rect.size.width;
+}
+
+function TFChartRectGetMinY(rect) {
+    return rect.origin.y;
+}
+
+function TFChartRectGetMaxY(rect) {
+    return rect.origin.y + rect.size.height;
+}
+
 function setCanvasSize(canvasId, x, y) {
     var canvas = document.getElementById(canvasId);
     canvas.width = x;
@@ -3648,12 +3664,10 @@ TFChart.prototype._periodCeil = function(value) {
 }
 
 TFChart.prototype._chartBounds = function() {
-    if (isNullOrUndefined(this.bounds)) {
-        var tl = this.valueAtPixelLocation(TFChartPointMake(this.x_axis.data_padding, this.y_axis.data_padding));
-        var br = this.valueAtPixelLocation(TFChartPointMake(Math.round(this.chart_canvas.width() - this.x_axis.padding) + 0.5 - (this.x_axis.data_padding * 2), Math.round(this.chart_canvas.height() - this.y_axis.padding) + 0.5 - (this.y_axis.data_padding * 2)));
+    var tl = this.valueAtPixelLocation(TFChartPointMake(this.x_axis.data_padding, this.y_axis.data_padding));
+    var br = this.valueAtPixelLocation(TFChartPointMake(Math.round(this.chart_canvas.width() - this.x_axis.padding) + 0.5 - (this.x_axis.data_padding * 2), Math.round(this.chart_canvas.height() - this.y_axis.padding) + 0.5 - (this.y_axis.data_padding * 2)));
 
-        this.bounds = new TFChartRectMake(tl.x, br.y, br.x - tl.x, tl.y - br.y);
-    }
+    this.bounds = new TFChartRectMake(tl.x, br.y, br.x - tl.x, tl.y - br.y);
 
     return this.bounds;
 }

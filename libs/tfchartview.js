@@ -310,12 +310,10 @@ TFChart.prototype._periodCeil = function(value) {
 }
 
 TFChart.prototype._chartBounds = function() {
-    if (isNullOrUndefined(this.bounds)) {
-        var tl = this.valueAtPixelLocation(TFChartPointMake(this.x_axis.data_padding, this.y_axis.data_padding));
-        var br = this.valueAtPixelLocation(TFChartPointMake(Math.round(this.chart_canvas.width() - this.x_axis.padding) + 0.5 - (this.x_axis.data_padding * 2), Math.round(this.chart_canvas.height() - this.y_axis.padding) + 0.5 - (this.y_axis.data_padding * 2)));
+    var tl = this.valueAtPixelLocation(TFChartPointMake(this.x_axis.data_padding, this.y_axis.data_padding));
+    var br = this.valueAtPixelLocation(TFChartPointMake(Math.round(this.chart_canvas.width() - this.x_axis.padding) + 0.5 - (this.x_axis.data_padding * 2), Math.round(this.chart_canvas.height() - this.y_axis.padding) + 0.5 - (this.y_axis.data_padding * 2)));
 
-        this.bounds = new TFChartRectMake(tl.x, br.y, br.x - tl.x, tl.y - br.y);
-    }
+    this.bounds = new TFChartRectMake(tl.x, br.y, br.x - tl.x, tl.y - br.y);
 
     return this.bounds;
 }

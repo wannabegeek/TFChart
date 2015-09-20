@@ -37,7 +37,7 @@ function TFChartHorizontalRay(lineColor, start) {
 }
 
 TFChartHorizontalRay.prototype.render = function(bounds, chart_view) {
-    if (this.point.x <= bounds.origin.x + bounds.size.width && this.point.y >= bounds.origin.y - bounds.size.height && this.point.y <= bounds.origin.y) {
+    if (this.point.x <= TFChartRectGetMaxX(bounds) && this.point.y <= TFChartRectGetMaxY(bounds) && this.point.y >= TFChartRectGetMinY(bounds)) {
         var ctx = chart_view.context;
         var plot = chart_view._plotArea();
         ctx.beginPath();
@@ -61,7 +61,7 @@ function TFChartVerticalRay(lineColor, start, is_down) {
 }
 
 TFChartVerticalRay.prototype.render = function(bounds, chart_view) {
-    if (this.point.x <= bounds.origin.x + bounds.size.width && this.point.x >= bounds.origin.x && ((!this.direction_down && this.point.y >= bounds.origin.y - bounds.size.height) || (this.direction_down && this.point.y >= bounds.origin.y))) {
+    if (this.point.x <= TFChartRectGetMaxX(bounds) && this.point.x >= bounds.origin.x && ((!this.direction_down && this.point.y >= bounds.origin.y - bounds.size.height) || (this.direction_down && this.point.y >= bounds.origin.y))) {
         var ctx = chart_view.context;
         var plot = chart_view._plotArea();
         ctx.beginPath();

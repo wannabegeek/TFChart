@@ -103,3 +103,19 @@ TFChartRect.prototype.containsPoint = function(point) {
 TFChartRect.prototype.intersectsRect = function(rect) {
     return (this.origin.x + this.size.width >= rect.origin.x && this.origin.x <= rect.origin.x + rect.size.width && this.origin.y + this.size.height >= rect.origin.y && this.origin.y <= rect.origin.y + rect.size.height);
 }
+
+function TFChartRectGetMinX(rect) {
+    return rect.origin.x;
+}
+
+function TFChartRectGetMaxX(rect) {
+    return rect.origin.x + rect.size.width;
+}
+
+function TFChartRectGetMinY(rect) {
+    return rect.origin.y;
+}
+
+function TFChartRectGetMaxY(rect) {
+    return rect.origin.y + rect.size.height;
+}
