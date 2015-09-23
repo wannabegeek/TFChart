@@ -3513,6 +3513,18 @@ TFChart.prototype.reset = function() {
     this.redraw();
 }
 
+TFChart.prototype.reflow = function() {
+    var width = this.container.width();
+    var height = this.container.height();
+    setCanvasSize('chart_canvas', width, height);
+    setCanvasSize('crosshair_canvas', width, height);
+    this.plot_area = null;
+    this.drawable_area = null;
+    this.bounds = null;
+    this._updateVisible();
+    this.redraw();
+}
+
 TFChart.prototype.pixelValueAtXValue = function(x) {
     var area = this._drawableArea();
     var ppdp = area.size.width / this.visible_data_points;
@@ -3906,15 +3918,7 @@ TFChart.prototype._drawCrosshair = function(point) {
 }
 
 TFChart.prototype._onResize = function() {
-    var width = this.container.width();
-    var height = this.container.height();
-    setCanvasSize('chart_canvas', width, height);
-    setCanvasSize('crosshair_canvas', width, height);
-    this.plot_area = null;
-    this.drawable_area = null;
-    this.bounds = null;
-    this._updateVisible();
-    this.redraw();
+    this.reflow();
 }
 
 TFChart.prototype._onMouseWheelScroll = function(e) {
