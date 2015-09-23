@@ -18,12 +18,43 @@ function TFChartDataController(chart, controller, period, callback) {
 }
 
 TFChartDataController.prototype.setPeriod = function(period) {
-    this.period = period;;
+    this.period = period;
 }
 
 TFChartDataController.prototype.setData = function(data) {
-    this.data = data;
+    this.data = this._normaliseData(data);
     this.data_range = new TFChartRange(this.data[0].timestamp, this.data[this.data.length - 1].timestamp - this.data[0].timestamp);
+}
+
+TFChartDataController.prototype._normaliseData = function(data) {
+    if (isNullOrUndefined(this.period)) {
+        return data;
+    } else {
+        var lastPoint = data[0];
+        var result = [lastPoint];
+        var self = this;
+        $.each(data, function(index, point) {
+            if (index != 0) {
+                // if (point.timestamp - lastPoint.timestamp > self.period) {
+                //     console.log("We have a gap to fill " + lastPoint.timestamp + " -> " + point.timestamp + " [" + self.period + "]");
+                // }
+                while (point.timestamp - lastPoint.timestamp > self.period) {
+                    lastPoint = {
+                        timestamp : lastPoint.timestamp + self.period,
+                        open: lastPoint.close,
+                        high: lastPoint.close,
+                        low: lastPoint.close,
+                        close: lastPoint.close
+                    };
+                    console.log("Adding gapped data");
+                    result.push(lastPoint);    
+                }
+                result.push(point);
+                lastPoint = point;
+            }
+        });
+        return result;
+    }
 }
 
 TFChartDataController.prototype._removeCurrentDataFromRange = function(range) {

@@ -2822,6 +2822,56 @@ require('moment');
     };
 
 })();
+function TFChartBarChartRenderer() {
+}
+
+TFChartBarChartRenderer.prototype.setOptions = function(options) {
+    var default_theme = {
+            barFillColor: "rgb(215, 84, 66)",
+            barStrokeColor: "rgb(107, 42, 33)"
+    };
+
+    this.theme = $.extend({}, default_theme, options.theme.barchart || {});
+}
+
+
+TFChartBarChartRenderer.prototype._fillCandle = function(ctx, isUp) {
+}
+
+TFChartBarChartRenderer.prototype.render = function(data, chart) {
+
+    var ctx = chart.context;
+    var x_start = chart.pixelValueAtXValue(data[0].timestamp);
+    var x_end = chart.pixelValueAtXValue(data[data.length - 1].timestamp);
+    var x_delta = x_end - x_start;
+    var bar_width = (x_delta / data.length) / 1.5;
+    var half_bar_width = bar_width / 2.0;
+
+    ctx.fillStyle = this.theme.barFillColor;
+    ctx.strokeStyle = this.theme.barStrokeColor;
+
+    self = this;
+    $.each(data, function(index, point) {
+        if (chart.doesXValueIntersectVisible(point.timestamp)) {
+            var plot = chart._plotArea();
+            var body_top = Math.round(chart.pixelValueAtYValue(point.close)) + 0.5;
+            var offset = chart.pixelValueAtXValue(point.timestamp);
+
+            if (offset > -half_bar_width) {
+                ctx.beginPath();
+                ctx.rect(Math.round(offset - half_bar_width) + 0.5,
+                                body_top,
+                                bar_width,
+                                plot.origin.y + plot.size.height - body_top);
+
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+    });
+
+}
+
 function TFChartCandlestickRenderer() {
 }
 
@@ -3136,12 +3186,43 @@ function TFChartDataController(chart, controller, period, callback) {
 }
 
 TFChartDataController.prototype.setPeriod = function(period) {
-    this.period = period;;
+    this.period = period;
 }
 
 TFChartDataController.prototype.setData = function(data) {
-    this.data = data;
+    this.data = this._normaliseData(data);
     this.data_range = new TFChartRange(this.data[0].timestamp, this.data[this.data.length - 1].timestamp - this.data[0].timestamp);
+}
+
+TFChartDataController.prototype._normaliseData = function(data) {
+    if (isNullOrUndefined(this.period)) {
+        return data;
+    } else {
+        var lastPoint = data[0];
+        var result = [lastPoint];
+        var self = this;
+        $.each(data, function(index, point) {
+            if (index != 0) {
+                // if (point.timestamp - lastPoint.timestamp > self.period) {
+                //     console.log("We have a gap to fill " + lastPoint.timestamp + " -> " + point.timestamp + " [" + self.period + "]");
+                // }
+                while (point.timestamp - lastPoint.timestamp > self.period) {
+                    lastPoint = {
+                        timestamp : lastPoint.timestamp + self.period,
+                        open: lastPoint.close,
+                        high: lastPoint.close,
+                        low: lastPoint.close,
+                        close: lastPoint.close
+                    };
+                    console.log("Adding gapped data");
+                    result.push(lastPoint);    
+                }
+                result.push(point);
+                lastPoint = point;
+            }
+        });
+        return result;
+    }
 }
 
 TFChartDataController.prototype._removeCurrentDataFromRange = function(range) {
@@ -3434,10 +3515,21 @@ function TFChart(container, renderer, options) {
     var x = this.container.width();
     var y = this.container.height();
 
-    container.append('<canvas id=\'chart_canvas\' width="' + x + 'px" height="' + y + 'px" style="position: absolute; left: 0; top: 0; width=100%; height=100%">Your browser doesn\'t support canvas.</canvas>');
-    container.append('<canvas id=\'crosshair_canvas\' width="' + x + 'px" height="' + y + 'px" style="position: absolute; left: 0; top: 0; width=100%; height=100%"></canvas>');
+    // we need to find a canvas id which isn't being used
+    var element_index = 0;
+    for (var element_index = 0; element_index < 1000; element_index++) {
+        element_name = "chart_canvas_" + element_index;
+        if (isNullOrUndefined(document.getElementById(element_name))) {
+            break;
+        }
+    }
+    this.chart_canvas_name = "chart_canvas_" + element_index;
+    this.crosshair_canvas_name = "crosshair_canvas_" + element_index;
 
-    var drawingCanvas = document.getElementById('chart_canvas');
+    container.append('<canvas id="' + this.chart_canvas_name + '" width="' + x + 'px" height="' + y + 'px" style="position: absolute; left: 0; top: 0; width=100%; height=100%">Your browser doesn\'t support canvas.</canvas>');
+    container.append('<canvas id="' + this.crosshair_canvas_name + '" width="' + x + 'px" height="' + y + 'px" style="position: absolute; left: 0; top: 0; width=100%; height=100%"></canvas>');
+
+    var drawingCanvas = document.getElementById(this.chart_canvas_name);
     // Check the element is in the DOM and the browser supports canvas
     if(drawingCanvas.getContext) {
         // Initaliase a 2-dimensional drawing context
@@ -3445,10 +3537,10 @@ function TFChart(container, renderer, options) {
         //Canvas commands go here
     }
 
-    this.chart_canvas = $('canvas#chart_canvas');
-    this.crosshair_canvas = $('canvas#crosshair_canvas');
+    this.chart_canvas = $('canvas#' + this.chart_canvas_name);
+    this.crosshair_canvas = $('canvas#' + this.crosshair_canvas_name);
 
-    var axisCanvas = document.getElementById('crosshair_canvas');
+    var axisCanvas = document.getElementById(this.crosshair_canvas_name);
     this.crosshair_canvas.css('cursor', 'crosshair');
 
     // Check the element is in the DOM and the browser supports canvas
@@ -3516,8 +3608,8 @@ TFChart.prototype.reset = function() {
 TFChart.prototype.reflow = function() {
     var width = this.container.width();
     var height = this.container.height();
-    setCanvasSize('chart_canvas', width, height);
-    setCanvasSize('crosshair_canvas', width, height);
+    setCanvasSize(this.chart_canvas_name, width, height);
+    setCanvasSize(this.crosshair_canvas_name, width, height);
     this.plot_area = null;
     this.drawable_area = null;
     this.bounds = null;
@@ -3604,6 +3696,13 @@ TFChart.prototype.zoom = function(delta, preventRedraw) {
     this._checkDataAvailable();
 }
 
+TFChart.prototype.log = function() {
+    var area = this._plotArea();
+
+    console.log("Canvas Size" + this.chart_canvas.width() + " x " + this.chart_canvas.height());
+    console.log("Plot Area" + area.origin.x + " x " + area.origin.y + " --> " + area.size.width + ", " + area.size.height);
+}
+
 ////////////// END PUBLIC METHODS /////////////
 
 TFChart.prototype._checkDataAvailable = function() {
@@ -3652,12 +3751,17 @@ TFChart.prototype._checkViewableRangeLimits = function() {
 
 TFChart.prototype._checkViewableOffsetLimits = function() {
     var area = this._drawableArea();
-    if (this.visible_offset > 0.0) {
-        result = Math.min(this.visible_offset, this.visible_data_points / 2.0);
+    var data_points = this.data_controller.data.length;
+    if (this.visible_data_points >= data_points) {
+        result = Math.max(this.visible_offset, 1.0);
+        result = Math.min(result, (this.visible_data_points - data_points));
     } else {
-        result = Math.max(this.visible_offset, -(this.data_controller.data.length - (this.visible_data_points / 2.0)));
+        if (this.visible_offset > 0.0) {
+            result = Math.min(this.visible_offset, this.visible_data_points / 2.0);
+        } else {
+            result = Math.max(this.visible_offset, -(data_points - (this.visible_data_points / 2.0)));
+        }
     }
-
     var restricted = (this.visible_offset === result);
     this.visible_offset = result;
     return restricted;
@@ -3897,7 +4001,7 @@ TFChart.prototype._drawCrosshair = function(point) {
 
         // bottom
         this.axis_context.save();
-        var x_text = this.x_axis.formatter.format(this._periodFloor(value.x + (self.period / 2.0)), this.x_axis, true);
+        var x_text = this.x_axis.formatter.format(this._periodFloor(value.x + (this.period / 2.0)), this.x_axis, true);
         var text_size = this.axis_context.measureText(x_text.text);
         var horizontalIndicatorSize = text_size.width + 10;
 
