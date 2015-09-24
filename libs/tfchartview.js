@@ -295,12 +295,13 @@ TFChart.prototype._reevaluateVerticalRange = function(data) {
             min = Math.min(min, point.low);
         }
     });
-    var delta = max - min;
-    var y_range = new TFChartRange(min, max - min);
-    if (!this.y_axis.range.equal(y_range)) {
-        this.y_axis.range = y_range;
-        if (this.options.view_range !== null) {
-            this.options.view_range(this, this.x_axis.range, this.y_axis.range);
+    if (max !== min) {
+        var y_range = new TFChartRange(min, max - min);
+        if (!this.y_axis.range.equal(y_range)) {
+            this.y_axis.range = y_range;
+            if (this.options.view_range !== null) {
+                this.options.view_range(this, this.x_axis.range, this.y_axis.range);
+            }
         }
     }
 };
@@ -394,7 +395,9 @@ TFChart.prototype._updateVisible = function() {
     });
 
     this.x_axis.range = new TFChartRange(start_x, end_x - start_x);
-    this.y_axis.range = new TFChartRange(min, max - min);
+    if (max !== min) {
+        this.y_axis.range = new TFChartRange(min, max - min);
+    }
     if (this.options.view_range !== null) {
         this.options.view_range(this, this.x_axis.range, this.y_axis.range);
     }

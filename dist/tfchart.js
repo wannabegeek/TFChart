@@ -2877,10 +2877,10 @@ function TFChartCandlestickRenderer() {
 
 TFChartCandlestickRenderer.prototype.setOptions = function(options) {
     var default_theme = {
-            upFillColor: "rgb(215, 84, 66)",
-            upStrokeColor: "rgb(107, 42, 33)",
-            downFillColor: "rgb(107, 165, 131)",
-            downStrokeColor: "rgb(53, 82, 65)",
+            upFillColor: "rgb(107, 165, 131)",
+            upStrokeColor: "rgb(53, 82, 65)",
+            downFillColor: "rgb(215, 84, 66)",
+            downStrokeColor: "rgb(107, 42, 33)",
             wickColor: "rgb(180, 180, 180)"        
     };
 
@@ -2889,7 +2889,7 @@ TFChartCandlestickRenderer.prototype.setOptions = function(options) {
 
 
 TFChartCandlestickRenderer.prototype._fillCandle = function(ctx, isUp) {
-    if (!isUp) {
+    if (isUp) {
         ctx.fillStyle = this.theme.upFillColor;
         ctx.strokeStyle = this.theme.upStrokeColor;
     } else {
@@ -3192,6 +3192,7 @@ TFChartDataController.prototype.setPeriod = function(period) {
 TFChartDataController.prototype.setData = function(data) {
     this.data = this._normaliseData(data);
     this.data_range = new TFChartRange(this.data[0].timestamp, this.data[this.data.length - 1].timestamp - this.data[0].timestamp);
+    this.no_data = 0;
 }
 
 TFChartDataController.prototype._normaliseData = function(data) {
@@ -3214,7 +3215,6 @@ TFChartDataController.prototype._normaliseData = function(data) {
                         low: lastPoint.close,
                         close: lastPoint.close
                     };
-                    console.log("Adding gapped data");
                     result.push(lastPoint);    
                 }
                 result.push(point);
@@ -3730,12 +3730,13 @@ TFChart.prototype._reevaluateVerticalRange = function(data) {
             min = Math.min(min, point.low);
         }
     });
-    var delta = max - min;
-    var y_range = new TFChartRange(min, max - min);
-    if (!this.y_axis.range.equal(y_range)) {
-        this.y_axis.range = y_range;
-        if (this.options.view_range !== null) {
-            this.options.view_range(this, this.x_axis.range, this.y_axis.range);
+    if (max !== min) {
+        var y_range = new TFChartRange(min, max - min);
+        if (!this.y_axis.range.equal(y_range)) {
+            this.y_axis.range = y_range;
+            if (this.options.view_range !== null) {
+                this.options.view_range(this, this.x_axis.range, this.y_axis.range);
+            }
         }
     }
 };
@@ -3829,7 +3830,9 @@ TFChart.prototype._updateVisible = function() {
     });
 
     this.x_axis.range = new TFChartRange(start_x, end_x - start_x);
-    this.y_axis.range = new TFChartRange(min, max - min);
+    if (max !== min) {
+        this.y_axis.range = new TFChartRange(min, max - min);
+    }
     if (this.options.view_range !== null) {
         this.options.view_range(this, this.x_axis.range, this.y_axis.range);
     }

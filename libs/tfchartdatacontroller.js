@@ -24,6 +24,7 @@ TFChartDataController.prototype.setPeriod = function(period) {
 TFChartDataController.prototype.setData = function(data) {
     this.data = this._normaliseData(data);
     this.data_range = new TFChartRange(this.data[0].timestamp, this.data[this.data.length - 1].timestamp - this.data[0].timestamp);
+    this.no_data = 0;
 }
 
 TFChartDataController.prototype._normaliseData = function(data) {
@@ -46,7 +47,6 @@ TFChartDataController.prototype._normaliseData = function(data) {
                         low: lastPoint.close,
                         close: lastPoint.close
                     };
-                    console.log("Adding gapped data");
                     result.push(lastPoint);    
                 }
                 result.push(point);
