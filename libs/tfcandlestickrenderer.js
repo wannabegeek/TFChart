@@ -3,10 +3,10 @@ function TFChartCandlestickRenderer() {
 
 TFChartCandlestickRenderer.prototype.setOptions = function(options) {
     var default_theme = {
-            upFillColor: "rgb(215, 84, 66)",
-            upStrokeColor: "rgb(107, 42, 33)",
-            downFillColor: "rgb(107, 165, 131)",
-            downStrokeColor: "rgb(53, 82, 65)",
+            upFillColor: "rgb(107, 165, 131)",
+            upStrokeColor: "rgb(53, 82, 65)",
+            downFillColor: "rgb(215, 84, 66)",
+            downStrokeColor: "rgb(107, 42, 33)",
             wickColor: "rgb(180, 180, 180)"        
     };
 
@@ -15,7 +15,7 @@ TFChartCandlestickRenderer.prototype.setOptions = function(options) {
 
 
 TFChartCandlestickRenderer.prototype._fillCandle = function(ctx, isUp) {
-    if (!isUp) {
+    if (isUp) {
         ctx.fillStyle = this.theme.upFillColor;
         ctx.strokeStyle = this.theme.upStrokeColor;
     } else {
