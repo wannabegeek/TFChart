@@ -152,11 +152,21 @@ TFChart.prototype.setVisible = function(range) {
 
     // number of pixels per time unit (across the whole range)
     var ratio = area.size.width / this.visible_data_points;
-    this.visible_offset = ((this.data_controller.data_range.position - range.position) * ratio) / this.period;
+    if (range.position < this.data_controller.data_range.position && this.data_controller.canSupplyData(TFChartDataRequestType.PREPEND)) {
+        var start = Math.min(range.position, this.data_controller.data_range.position);
+        var range =  new TFChartRange(start, this.data_controller.data_range.position - start);
+        this.data_controller.requestData(range, TFChartDataRequestType.PREPEND);
+    } else if (TFChartRangeMax(range) > TFChartRangeMax(this.data_controller.data_range) && this.data_controller.canSupplyData(TFChartDataRequestType.APPEND)) {
+        var start = Math.max(range.position, this.data_controller.data_range.position);
+        var range =  new TFChartRange(start, TFChartRangeMax(range) - start);
+        this.data_controller.requestData(range, TFChartDataRequestType.PREPEND);
+    } else {
+        this.visible_offset = ((this.data_controller.data_range.position - range.position) / this.period);
 
-    this._checkViewableLimits();
-    this._updateVisible();
-    this.redraw();
+        this._checkViewableLimits();
+        this._updateVisible();
+        this.redraw();        
+    }
 }
 
 TFChart.prototype.doesXValueIntersectVisible = function(x) {
@@ -166,8 +176,10 @@ TFChart.prototype.doesXValueIntersectVisible = function(x) {
 TFChart.prototype.reset = function() {
     this.visible_offset = 0.0;
     this.visible_data_points = this.options.initial_data_points;
-    this._updateVisible();
-    this.redraw();
+    if (!isNullOrUndefined(this.data_controller.data) && this.data_controller.data.length != 0) {
+        this._updateVisible();
+        this.redraw();
+    }
 }
 
 TFChart.prototype.reflow = function() {
@@ -178,8 +190,10 @@ TFChart.prototype.reflow = function() {
     this.plot_area = null;
     this.drawable_area = null;
     this.bounds = null;
-    this._updateVisible();
-    this.redraw();
+    if (!isNullOrUndefined(this.data_controller.data) && this.data_controller.data.length != 0) {
+        this._updateVisible();
+        this.redraw();
+    }
 }
 
 TFChart.prototype.pixelValueAtXValue = function(x) {
